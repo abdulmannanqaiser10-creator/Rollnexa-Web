@@ -16,6 +16,7 @@ import {
   mapAuthError,
 } from "@/lib/auth-client";
 import { loginSchema } from "@/lib/validations/auth";
+import { isSafeCallbackPath } from "@/lib/edge-security";
 import { SocialButtons } from "./social-buttons";
 import type { z } from "zod";
 
@@ -60,12 +61,7 @@ function LoginForm({
         return;
       }
 
-      const safeCallback =
-        callbackUrl &&
-        callbackUrl.startsWith("/") &&
-        !callbackUrl.startsWith("//")
-          ? callbackUrl
-          : null;
+      const safeCallback = isSafeCallbackPath(callbackUrl) ? callbackUrl : null;
 
       router.push(safeCallback || dashboardPathForRole(result?.user?.role));
       router.refresh();

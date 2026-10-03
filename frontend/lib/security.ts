@@ -11,6 +11,27 @@ export const MACHINE_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 
 
 const rateLimitStore = new Map<string, { count: number; resetAt: number }>();
+const MAX_RATE_LIMIT_KEYS = 10_000;
+let nextRateLimitPruneAt = 0;
+
+function pruneRateLimitStore(now: number) {
+  if (now < nextRateLimitPruneAt && rateLimitStore.size < MAX_RATE_LIMIT_KEYS) {
+    return;
+  }
+  nextRateLimitPruneAt = now + 30_000;
+  for (const [key, bucket] of rateLimitStore) {
+    if (bucket.resetAt <= now) rateLimitStore.delete(key);
+  }
+  if (rateLimitStore.size > MAX_RATE_LIMIT_KEYS) {
+    const excess = rateLimitStore.size - MAX_RATE_LIMIT_KEYS;
+    let removed = 0;
+    for (const key of rateLimitStore.keys()) {
+      if (removed >= excess) break;
+      rateLimitStore.delete(key);
+      removed += 1;
+    }
+  }
+}
 
 const ALLOWED_ORIGINS = () => {
   const origins = new Set<string>();
@@ -50,6 +71,10 @@ export function checkRateLimit(
   windowMs = 60_000
 ) {
   const now = Date.now();
+  if (process.env.RATE_LIMIT_DISABLED === "true") {
+    return { allowed: true, remaining: limit };
+  }
+  pruneRateLimitStore(now);
   const key = getRateLimitKey(prefix, request);
   const current = rateLimitStore.get(key);
 
@@ -135,14 +160,28 @@ export async function requireApiSession(role?: "BUYER" | "SELLER" | "ADMIN") {
 }
 
 /** Strip HTML-like characters and normalize whitespace for user-generated text. */
+const HTML_TAG_RE = /<[^\s>][^>]*>?/g;
+const CONTROL_CHARS_RE = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F\u200B-\u200F\u2028\u2029\uFEFF]/g;
+const DANGEROUS_URI_RE = /\b(?:javascript|vbscript)\s*:/gi;
+const INLINE_HANDLER_RE = /\bon[a-z]+\s*=/gi;
+
 export function sanitizeText(value: string) {
   return value
+    .replace(CONTROL_CHARS_RE, "")
+    .replace(HTML_TAG_RE, " ")
     .replace(/[<>]/g, "")
-    .replace(/javascript:/gi, "")
-    .replace(/on\w+=/gi, "")
+    .replace(DANGEROUS_URI_RE, "")
+    .replace(INLINE_HANDLER_RE, "")
     .replace(/\s+/g, " ")
     .trim();
 }
+
+/**
+ * Open-redirect guard for `callbackUrl` / `returnTo` style params.
+ * Only same-site absolute paths are accepted (`//host`, `\\host` and
+ * scheme-relative tricks are rejected).
+ */
+export { isSafeCallbackPath } from "@/lib/edge-security";
 
 export function validateBody<T>(schema: z.ZodSchema<T>, body: unknown) {
   return schema.safeParse(body);

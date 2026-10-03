@@ -272,6 +272,7 @@ export default async function SellerInquiryDetailPage({
                   href={`/machines/${inquiry.machine.slug}`}
                   className="mt-1 text-xs font-semibold text-[#F5B800] underline-offset-4 hover:underline"
                   target="_blank"
+                  rel="noopener noreferrer"
                 >
                   View Listing ↗
                 </Link>

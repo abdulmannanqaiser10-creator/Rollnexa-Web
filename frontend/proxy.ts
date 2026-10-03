@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSessionCookie } from "better-auth/cookies";
 import { getSecurityHeaders } from "@/lib/security-headers";
+import { guardRequest } from "@/lib/edge-security";
 
 const publicRoutes = [
   "/",
@@ -75,6 +76,22 @@ export async function proxy(request: NextRequest) {
   const isPrivate = privatePrefixes.some(
     (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
+
+  // Central request guards: path traversal / null bytes, cross-site (CSRF)
+  // rejection for mutating methods, and per-IP rate limiting on /api/*.
+  const guard = guardRequest({
+    method: request.method,
+    url: request.url,
+    headers: request.headers,
+  });
+  if (!guard.ok) {
+    const denied = NextResponse.json(
+      { error: guard.error },
+      { status: guard.status, headers: guard.headers }
+    );
+    applyHeaders(denied, pathname, true);
+    return denied;
+  }
 
   if (
     request.headers.get("x-forwarded-proto") === "http" &&

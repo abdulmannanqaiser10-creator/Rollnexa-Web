@@ -1,5 +1,6 @@
 import { AuthLayout } from "@/components/auth/auth-layout";
 import { LoginForm } from "@/components/auth/login-form";
+import { isSafeCallbackPath } from "@/lib/edge-security";
 
 import type { Metadata } from "next";
 import { buildMetadata } from "@/lib/seo";
@@ -17,12 +18,9 @@ type LoginPageProps = {
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
   const params = await searchParams;
-  const callbackUrl =
-    params.callbackUrl &&
-    params.callbackUrl.startsWith("/") &&
-    !params.callbackUrl.startsWith("//")
-      ? params.callbackUrl
-      : undefined;
+  const callbackUrl = isSafeCallbackPath(params.callbackUrl)
+    ? params.callbackUrl
+    : undefined;
   const oauthError = params.error?.trim() || undefined;
 
   return (

@@ -1,23 +1,14 @@
 import type { NextConfig } from "next";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { getSecurityHeaders } from "./lib/security-headers";
 
 const configDir = path.dirname(fileURLToPath(import.meta.url));
 const monorepoRoot = path.join(configDir, "..");
 
-const securityHeaders = [
-  { key: "X-Frame-Options", value: "DENY" },
-  { key: "X-Content-Type-Options", value: "nosniff" },
-  { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  {
-    key: "Permissions-Policy",
-    value: "geolocation=(), microphone=(), camera=(), payment=()",
-  },
-  {
-    key: "Strict-Transport-Security",
-    value: "max-age=31536000; includeSubDomains; preload",
-  },
-];
+const securityHeaders = Object.entries(getSecurityHeaders()).map(
+  ([key, value]) => ({ key, value })
+);
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,

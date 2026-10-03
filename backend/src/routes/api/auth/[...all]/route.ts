@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { toNextJsHandler } from "better-auth/next-js";
+import { enforcePasswordPolicy } from "@/lib/auth/password-policy";
 
 const handler = toNextJsHandler(auth);
 
@@ -32,5 +33,7 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const rejection = await enforcePasswordPolicy(request);
+  if (rejection) return rejection;
   return withAuthLogging("POST", request);
 }

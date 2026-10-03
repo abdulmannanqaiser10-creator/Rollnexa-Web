@@ -22,6 +22,8 @@ function PasswordInput({ className, ...props }: PasswordInputProps) {
         onClick={() => setShow(!show)}
         className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
         tabIndex={-1}
+        aria-label={show ? "Hide password" : "Show password"}
+        aria-pressed={show}
       >
         {show ? <EyeOff size={18} /> : <Eye size={18} />}
       </button>

@@ -12,6 +12,7 @@ import { MachineActionMenu } from "@/components/seller/MachineActionMenu";
 import { SellerListingFeedback } from "@/components/seller/SellerListingFeedback";
 import { EmptyState } from "@/components/seller/EmptyState";
 import { prisma } from "@/lib/db";
+import { PromoteListingButton } from "@/components/seller/PromoteListingButton";
 
 export const metadata = {
   title: "My Machines — Rollnexa",
@@ -301,6 +302,7 @@ export default async function SellerMachinesPage({
                             machineTitle={machine.title}
                             status={machine.status}
                           />
+                          {machine.status === "PUBLISHED" ? <PromoteListingButton listingId={machine.id} /> : null}
                         </div>
                       </td>
                     </tr>

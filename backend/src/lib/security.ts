@@ -129,6 +129,11 @@ export async function requireApiSession(role?: "BUYER" | "SELLER" | "ADMIN") {
     }
   } catch (error) {
     console.error("[security] account status check failed", error);
+    logSecurityEvent("account_status_unavailable", { userId: session.user.id });
+    return {
+      session: null,
+      response: NextResponse.json({ error: "Unable to verify account status" }, { status: 503 }) as Response,
+    };
   }
 
   return { session, response: undefined as Response | undefined };

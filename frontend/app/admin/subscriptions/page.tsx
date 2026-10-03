@@ -35,11 +35,12 @@ export default async function AdminSubscriptionsPage() {
             </div>
             <p className="mt-2 text-sm text-rn-muted">{plan.description}</p>
             <p className="mt-4 text-2xl font-bold text-rn-ink">
-              {plan.price === 0 ? "Free" : `$${plan.price}`}
+              {plan.price === 0 ? "Free" : `${plan.currency} ${plan.price}`}
             </p>
             <ul className="mt-4 space-y-1 text-sm text-rn-muted">
               <li>Listings: {plan.maxListings ?? "Unlimited"}</li>
               <li>Featured: {plan.featuredListings}</li>
+              <li>Promotion credits: {plan.promotionCredits}</li>
               <li>Premium badge: {plan.premiumBadge ? "Yes" : "No"}</li>
               <li>Analytics: {plan.analytics ? "Yes" : "No"}</li>
             </ul>

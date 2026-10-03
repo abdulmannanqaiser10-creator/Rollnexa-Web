@@ -1,0 +1,30 @@
+import { NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
+import { getRequestHeaders } from "@/lib/request-context";
+import { assertSameOrigin, checkRateLimit, rateLimitResponse } from "@/lib/security";
+import { createPromotionCheckout, redeemPromotionCredit } from "@/lib/promotions/service";
+import { prisma } from "@/lib/db";
+
+type Context = { params: Promise<{ id: string }> };
+
+export async function POST(request: Request, context: Context) {
+  try {
+    const origin = assertSameOrigin(request); if (!origin.ok) return origin.response;
+    const limit = checkRateLimit(request, "promotion-purchase", 8, 60_000); if (!limit.allowed) return rateLimitResponse(limit.resetAt);
+    const session = await auth.api.getSession({ headers: getRequestHeaders() });
+    if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    if (session.user.role !== "SELLER") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    const { id: listingId } = await context.params;
+    const body = await request.json().catch(() => null) as { packageSlug?: unknown; useCredit?: unknown } | null;
+    if (typeof body?.packageSlug !== "string" || !/^[a-z0-9-]{2,50}$/.test(body.packageSlug)) return NextResponse.json({ error: "Invalid promotion package" }, { status: 400 });
+    if (body.useCredit === true) {
+      const result = await redeemPromotionCredit({ userId: session.user.id, listingId, packageSlug: body.packageSlug });
+      if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+      return NextResponse.json({ success: true, promotion: result.promotion, creditBalance: result.creditBalance });
+    }
+    const profile = await prisma.profile.findUnique({ where: { userId: session.user.id }, select: { phone: true } });
+    const result = await createPromotionCheckout({ userId: session.user.id, listingId, packageSlug: body.packageSlug, customerEmail: session.user.email, customerName: session.user.name ?? "Seller", customerPhone: profile?.phone ?? undefined });
+    if ("error" in result) return NextResponse.json({ error: result.error }, { status: result.status });
+    return NextResponse.json({ success: true, paymentId: result.payment.id, checkout: result.checkout });
+  } catch (error) { console.error("[seller/machines/id/promotions] POST failed", error); return NextResponse.json({ error: "Unable to start promotion" }, { status: 500 }); }
+}

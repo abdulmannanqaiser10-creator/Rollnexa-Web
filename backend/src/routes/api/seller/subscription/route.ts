@@ -1,11 +1,11 @@
+import { getRequestHeaders } from "@/lib/request-context";
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { getSellerSubscriptionView } from "@/lib/subscriptions/service";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({ headers: await headers() });
+    const session = await auth.api.getSession({ headers: getRequestHeaders() });
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

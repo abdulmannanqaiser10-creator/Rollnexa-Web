@@ -13,7 +13,10 @@
     "db:seed": "npm --prefix backend run db:seed",
     "db:verify": "npm --prefix backend run db:verify",
     "seed:admin": "npm --prefix backend run seed:admin",
+    "seed:seller": "npm --prefix backend run seed:seller",
+    "migrate:auth-issuer": "npm --prefix backend run migrate:auth-issuer",
     "seed:plans": "npm --prefix backend run seed:plans",
+    "seed:promotions": "npm --prefix backend run seed:promotions",
     "test:admin-auth": "npm --prefix backend run test:admin-auth",
     "test:qa": "npm --prefix backend run test:qa"
   }

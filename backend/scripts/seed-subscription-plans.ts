@@ -8,8 +8,10 @@ const DEFAULT_PLANS = [
     description: "Get started with essential marketplace tools.",
     price: 0,
     durationDays: 36500,
-    maxListings: 5,
+    currency: "PKR",
+    maxListings: 1,
     featuredListings: 0,
+    promotionCredits: 0,
     homepageFeatured: false,
     premiumBadge: false,
     analytics: false,
@@ -22,10 +24,12 @@ const DEFAULT_PLANS = [
     name: "Basic",
     slug: "basic",
     description: "Grow your inventory with featured visibility.",
-    price: 49,
+    price: 1499,
+    currency: "PKR",
     durationDays: 30,
-    maxListings: 25,
-    featuredListings: 3,
+    maxListings: 5,
+    featuredListings: 0,
+    promotionCredits: 0,
     homepageFeatured: false,
     premiumBadge: false,
     analytics: false,
@@ -35,15 +39,17 @@ const DEFAULT_PLANS = [
     sortOrder: 1,
   },
   {
-    name: "Premium",
+    name: "Pro",
     slug: "premium",
     description: "Unlock homepage placement and premium seller tools.",
-    price: 99,
+    price: 2999,
+    currency: "PKR",
     durationDays: 30,
-    maxListings: null,
-    featuredListings: 10,
-    homepageFeatured: true,
-    premiumBadge: true,
+    maxListings: 20,
+    featuredListings: 1,
+    promotionCredits: 1,
+    homepageFeatured: false,
+    premiumBadge: false,
     analytics: true,
     prioritySupport: true,
     dealerProfile: false,
@@ -51,13 +57,15 @@ const DEFAULT_PLANS = [
     sortOrder: 2,
   },
   {
-    name: "Enterprise",
+    name: "Business",
     slug: "enterprise",
     description: "Full dealer profile and unlimited premium placement.",
-    price: 199,
+    price: 5999,
+    currency: "PKR",
     durationDays: 30,
-    maxListings: null,
-    featuredListings: 999,
+    maxListings: 100,
+    featuredListings: 3,
+    promotionCredits: 3,
     homepageFeatured: true,
     premiumBadge: true,
     analytics: true,
@@ -72,26 +80,19 @@ async function main() {
   const { prisma } = createScriptPrisma();
   try {
     for (const plan of DEFAULT_PLANS) {
-      await prisma.subscriptionPlan.upsert({
-        where: { slug: plan.slug },
-        update: {
-          name: plan.name,
-          description: plan.description,
-          price: plan.price,
-          durationDays: plan.durationDays,
-          maxListings: plan.maxListings,
-          featuredListings: plan.featuredListings,
-          homepageFeatured: plan.homepageFeatured,
-          premiumBadge: plan.premiumBadge,
-          analytics: plan.analytics,
-          prioritySupport: plan.prioritySupport,
-          dealerProfile: plan.dealerProfile,
-          topSearchPriority: plan.topSearchPriority,
-          sortOrder: plan.sortOrder,
-          isActive: true,
-        },
-        create: { ...plan, isActive: true },
-      });
+      const existing = await prisma.subscriptionPlan.findUnique({ where: { slug: plan.slug }, select: { id: true } });
+      if (!existing) {
+        await prisma.subscriptionPlan.create({ data: { ...plan, isActive: true } });
+      } else {
+        const legacy = await prisma.subscriptionPlan.findUnique({ where: { slug: plan.slug }, select: { price: true, currency: true, maxListings: true } });
+        const oldDefaults: Record<string, { price: number; listings: number | null }> = {
+          basic: { price: 49, listings: 25 }, premium: { price: 99, listings: null }, enterprise: { price: 199, listings: null }, free: { price: 0, listings: 5 },
+        };
+        const previous = oldDefaults[plan.slug];
+        if (legacy && previous && legacy.price === previous.price && legacy.currency === "USD" && legacy.maxListings === previous.listings) {
+          await prisma.subscriptionPlan.update({ where: { slug: plan.slug }, data: { name: plan.name, price: plan.price, currency: plan.currency, maxListings: plan.maxListings, featuredListings: plan.featuredListings, promotionCredits: plan.promotionCredits } });
+        }
+      }
     }
     const plans = await prisma.subscriptionPlan.findMany({
       orderBy: { sortOrder: "asc" },

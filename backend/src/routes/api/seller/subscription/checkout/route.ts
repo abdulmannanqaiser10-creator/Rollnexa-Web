@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createSubscriptionCheckout } from "@/lib/payments/service";
+import { prisma } from "@/lib/db";
 import { checkoutSchema } from "@/lib/validations/subscription";
 import { checkRateLimit, enforceRequestSize, requireApiSession, validateBody, assertSameOrigin, rateLimitResponse } from "@/lib/security";
 
@@ -34,12 +35,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
+    const profile = await prisma.profile.findUnique({ where: { userId: session.user.id }, select: { phone: true } });
     const result = await createSubscriptionCheckout({
       userId: session.user.id,
       planSlug: parsed.data.planSlug,
+      billingCycle: parsed.data.billingCycle,
       provider: parsed.data.provider,
       paymentMethod: parsed.data.paymentMethod,
       renew: parsed.data.renew,
+      customerEmail: session.user.email,
+      customerName: session.user.name ?? undefined,
+      customerPhone: profile?.phone ?? undefined,
     });
 
     if ("error" in result && result.error) {

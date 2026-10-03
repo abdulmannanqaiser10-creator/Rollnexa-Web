@@ -92,22 +92,18 @@ export async function getSellerSubscriptionView(
 ): Promise<SellerSubscriptionView> {
   await expireDueSubscriptions();
 
-  const [freePlan, activeSub, listingCount, featuredCount] = await Promise.all([
+  const [freePlan, activeSub, listingCount, featuredCount, user] = await Promise.all([
     getFreePlan(),
     prisma.userSubscription.findFirst({
       where: { userId, status: "ACTIVE" },
       include: { plan: true },
       orderBy: { createdAt: "desc" },
     }),
-    prisma.machine.count({
-      where: {
-        sellerId: userId,
-        status: { notIn: ["ARCHIVED"] },
-      },
-    }),
+    prisma.machine.count({ where: { sellerId: userId, status: { in: ["DRAFT", "PENDING_REVIEW", "PUBLISHED"] } } }),
     prisma.machine.count({
       where: { sellerId: userId, isFeatured: true, status: "PUBLISHED" },
     }),
+    prisma.user.findUnique({ where: { id: userId }, select: { freeListingsUsed: true, accountStatus: true } }),
   ]);
 
   if (activeSub?.plan && activeSub.status === "ACTIVE") {
@@ -130,6 +126,20 @@ export async function getSellerSubscriptionView(
     entitlements.featuredListings - featuredCount
   );
 
+  const freeLimit = freePlan.maxListings ?? 1;
+  const historicListings = await prisma.machine.count({ where: { sellerId: userId } });
+  const freeListingsRemaining = Math.max(0, freeLimit - Math.max(user?.freeListingsUsed ?? 0, historicListings));
+  const accountDisabled = user?.accountStatus !== "ACTIVE";
+  const planInactive = Boolean(activeSub && !activeSub.plan.isActive);
+  const canCreateListing = !accountDisabled && !planInactive && (
+    isUnlimitedListings(entitlements.maxListings) || listingCount < entitlements.maxListings
+  );
+  const reason = accountDisabled ? "SELLER_DISABLED" as const
+    : planInactive ? "PLAN_INACTIVE" as const
+    : canCreateListing ? (plan.slug === "free" && freeListingsRemaining > 0 ? "FREE_LISTING_AVAILABLE" as const : "ALLOWED" as const)
+    : activeSub?.expiryDate && activeSub.expiryDate < new Date() ? "SUBSCRIPTION_EXPIRED" as const
+    : activeSub ? "LISTING_LIMIT_REACHED" as const : "NO_SUBSCRIPTION" as const;
+
   return {
     subscription: activeSub,
     plan,
@@ -138,11 +148,27 @@ export async function getSellerSubscriptionView(
     entitlements,
     listingCount,
     featuredCount,
-    canCreateListing:
-      isUnlimitedListings(entitlements.maxListings) ||
-      listingCount < entitlements.maxListings,
+    canCreateListing: canCreateListing && (plan.slug !== "free" || freeListingsRemaining > 0),
     listingsRemaining,
     featuredRemaining,
+    reason: plan.slug === "free" && freeListingsRemaining <= 0 ? "LISTING_LIMIT_REACHED" : reason,
+    freeListingsRemaining,
+    requiresSubscription: plan.slug === "free" && freeListingsRemaining <= 0,
+  };
+}
+
+export async function checkListingEntitlement(userId: string) {
+  const view = await getSellerSubscriptionView(userId);
+  return {
+    canCreateListing: view.canCreateListing,
+    reason: view.reason,
+    currentListings: view.listingCount,
+    listingLimit: view.entitlements.maxListings,
+    remainingListings: view.listingsRemaining,
+    freeListingsRemaining: view.freeListingsRemaining,
+    subscriptionStatus: view.status,
+    plan: view.plan,
+    requiresSubscription: view.requiresSubscription,
   };
 }
 

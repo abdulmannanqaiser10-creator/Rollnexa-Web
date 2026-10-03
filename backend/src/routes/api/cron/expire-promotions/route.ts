@@ -1,0 +1,9 @@
+import { NextResponse } from "next/server";
+import { expireDuePromotions } from "@/lib/promotions/service";
+
+export async function POST(request: Request) {
+  const secret = process.env.CRON_SECRET?.trim();
+  if (!secret || request.headers.get("authorization") !== `Bearer ${secret}`) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  try { const result = await expireDuePromotions(); return NextResponse.json({ success: true, expired: result.count }); }
+  catch (error) { console.error("[cron/expire-promotions] failed", error); return NextResponse.json({ error: "Promotion cleanup failed" }, { status: 500 }); }
+}

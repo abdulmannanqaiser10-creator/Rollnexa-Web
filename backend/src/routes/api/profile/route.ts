@@ -1,5 +1,5 @@
+import { getRequestHeaders } from "@/lib/request-context";
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -16,7 +16,7 @@ const bodySchema = z.object({
 
 async function getAuthedSession() {
   return auth.api.getSession({
-    headers: await headers(),
+    headers: getRequestHeaders(),
   });
 }
 

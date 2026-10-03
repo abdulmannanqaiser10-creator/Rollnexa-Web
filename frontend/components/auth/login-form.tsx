@@ -138,8 +138,6 @@ function LoginForm({
         <SocialButtons
           disabled={loading}
           dividerText="Or continue with"
-          callbackUrl={callbackUrl}
-          onError={(message) => setError(message || null)}
         />
 
         <button

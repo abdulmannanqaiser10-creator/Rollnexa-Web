@@ -302,7 +302,6 @@ function RegisterForm() {
         <SocialButtons
           disabled={loading}
           dividerText="Or sign up with"
-          onError={(message) => setError(message || null)}
         />
 
         <button

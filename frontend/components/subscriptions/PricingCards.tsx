@@ -46,7 +46,7 @@ export function PricingCards({ plans, currentPlanSlug }: PricingCardsProps) {
       const res = await fetch("/api/seller/subscription/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ planSlug, provider: "manual" }),
+        body: JSON.stringify({ planSlug }),
       });
       const data = await res.json().catch(() => null);
       if (!res.ok) {
@@ -54,7 +54,10 @@ export function PricingCards({ plans, currentPlanSlug }: PricingCardsProps) {
         return;
       }
       const url = data?.checkout?.checkoutUrl;
-      if (url) router.push(url);
+      if (typeof url === "string") {
+        if (/^https:\/\//i.test(url)) window.location.assign(url);
+        else router.push(url);
+      }
     } catch {
       setError("Unable to start checkout");
     } finally {
@@ -88,7 +91,7 @@ export function PricingCards({ plans, currentPlanSlug }: PricingCardsProps) {
                 </p>
                 <div className="mt-2 flex items-end gap-1">
                   <span className="font-display text-3xl font-bold text-[#111827]">
-                    {plan.price === 0 ? "Free" : `$${plan.price}`}
+                    {plan.price === 0 ? "Free" : `${plan.currency} ${plan.price}`}
                   </span>
                   {plan.price > 0 ? (
                     <span className="pb-1 text-sm text-[#6B7280]">/month</span>

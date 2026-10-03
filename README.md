@@ -10,7 +10,7 @@ Built with **Next.js App Router**, **Better Auth**, **Prisma**, **local MongoDB*
 - Buyer dashboard: favorites, inquiries, messages, reviews, recently viewed
 - Seller dashboard: listings, moderation workflow, analytics, messaging
 - Admin panel: users, machines, approvals, reports, catalogs, subscriptions
-- Subscription & premium plans with payment architecture (manual + provider-ready)
+- Seller subscriptions, lifetime free listing allowance, promotion packages, and Safepay hosted checkout
 - Notifications, reviews & ratings, Cloudinary image uploads
 
 ## Tech Stack
@@ -46,6 +46,7 @@ npm run db:push
 npm run db:generate
 npm run db:seed
 npm run seed:plans
+npm run seed:promotions
 npm run seed:admin   # optional local admin bootstrap
 npm run dev
 ```
@@ -80,10 +81,14 @@ Copy `backend/.env.example` to `backend/.env` / Vercel project settings. **Never
 | `CLOUDINARY_API_SECRET` | No | Image hosting |
 | `RESEND_API_KEY` | No | Transactional email |
 | `PAYMENT_PROVIDER` | No | `manual` (default), `stripe`, etc. |
-| `ALLOW_MANUAL_PAYMENTS` | Prod | Must be `true` to allow manual payment confirmation in production |
 | `STRIPE_SECRET_KEY` | No | Stripe server key |
 | `STRIPE_PUBLIC_KEY` | No | Stripe publishable key |
 | `STRIPE_WEBHOOK_SECRET` | No | Stripe webhooks |
+| `SAFEPAY_ENVIRONMENT` | Safepay | `sandbox` (default) or `production` |
+| `SAFEPAY_API_KEY` | Safepay | Merchant secret API key; server only |
+| `SAFEPAY_WEBHOOK_SECRET` | Safepay | Signing secret configured in the Safepay Developer Dashboard |
+| `PROMOTION_CREDIT_PACKAGE_SLUG` | No | Package slug granted as plan credits (default `featured`) |
+| `CRON_SECRET` | Production | Secret for the promotion expiry cron endpoint |
 | `ADMIN_NAME` / `DEV_ADMIN_NAME` | Local/ops | Designated admin display name |
 | `ADMIN_EMAIL` / `DEV_ADMIN_EMAIL` | Local/ops | Designated admin email (only this account may use Admin Panel) |
 | `ADMIN_PASSWORD` / `DEV_ADMIN_PASSWORD` | Local/ops | Designated admin password (never commit; used by `npm run seed:admin`) |
@@ -125,6 +130,7 @@ npm run test:admin-auth  # Admin auth gate tests (requires ADMIN_PASSWORD or DEV
 npm run db:push      # Sync Prisma schema to local MongoDB
 npm run db:seed      # Seed categories & brands
 npm run seed:plans   # Seed subscription plans
+npm run seed:promotions # Seed promotion packages
 npm run seed:admin   # Bootstrap designated admin (requires ADMIN_* or DEV_ADMIN_*)
 ```
 
@@ -155,10 +161,11 @@ Public registration only creates **BUYER** or **SELLER**. Admin accounts are cre
 3. Set environment variables from the table above.
 4. Set `BETTER_AUTH_URL` to your Vercel production URL.
 5. Deploy. Build command: `npm run build` (already configured).
-6. After first deploy, sync the schema and seed subscription plans:
+6. After first deploy, sync the schema and seed plans and promotion packages:
    ```bash
    npm run db:push
    npm run seed:plans
+   npm run seed:promotions
    ```
 
 ## Production Checklist
@@ -169,9 +176,17 @@ Public registration only creates **BUYER** or **SELLER**. Admin accounts are cre
 - [ ] Prisma schema synced (`npm run db:push`)
 - [ ] Subscription plans seeded
 - [ ] Cloudinary configured for image uploads (recommended)
-- [ ] Set `ALLOW_MANUAL_PAYMENTS=false` once Stripe (or another provider) is live
+- [ ] Configure Safepay production keys and register the webhook only after merchant onboarding
 - [ ] Verify `/robots.txt` and `/sitemap.xml` on production
 - [ ] Spot-check Open Graph / Twitter cards with a social debugger
+
+## Subscriptions & Pakistani payments
+
+The default plans are Free (one lifetime free listing), Basic (PKR 1,499 / 5 active listings), Pro (PKR 2,999 / 20 active listings / one promotion credit), and Business (PKR 5,999 / 100 active listings / three promotion credits). Admins can manage plans and promotion packages in the admin APIs; package defaults are Boost (PKR 500 / 3 days), Featured (PKR 1,000 / 7 days), and Premium (PKR 2,500 / 14 days). Prices, listing allowances, package terms, and credits are configurable.
+
+For testing, create a Safepay sandbox account and use its sandbox API key and webhook secret. Set `SAFEPAY_ENVIRONMENT=sandbox` and `PAYMENT_PROVIDER=safepay`. The hosted checkout and API automatically use Safepay's sandbox endpoints; sandbox payments have no financial impact. To go live, complete Safepay merchant onboarding, replace the sandbox credentials with production credentials, set `SAFEPAY_ENVIRONMENT=production`, and set `PAYMENT_PROVIDER=safepay`. Register the HTTPS webhook URL `https://<your-domain>/api/payments/safepay/webhook` in Safepay Developer Dashboard > Webhooks and set its signing secret as `SAFEPAY_WEBHOOK_SECRET`. Credentials remain server-side. The application activates subscriptions or promotions only after verifying Safepay's webhook signature, payment state, reference, amount, and currency. Renewals are user-initiated; automatic recurring billing is not enabled.
+
+Use the [Safepay API reference](https://apidocs.getsafepay.com/) and the [official Safepay Node SDK](https://github.com/getsafepay/safepay-node) for current API, sandbox, checkout, and webhook requirements. The Safepay account must have the local payment methods you want enabled.
 
 ## SEO & Security Notes
 

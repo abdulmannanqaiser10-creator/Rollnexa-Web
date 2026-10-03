@@ -47,6 +47,7 @@ export async function seedDevAdmin({
       data: {
         userId: user.id,
         providerId: "credential",
+        issuer: "local:credential",
         accountId: user.id,
         password: hashed,
       },
@@ -59,13 +60,19 @@ export async function seedDevAdmin({
   if (credential) {
     await prisma.account.update({
       where: { id: credential.id },
-      data: { password: hashed },
+      data: {
+        providerId: "credential",
+        issuer: "local:credential",
+        accountId: existing.id,
+        password: hashed,
+      },
     });
   } else {
     await prisma.account.create({
       data: {
         userId: existing.id,
         providerId: "credential",
+        issuer: "local:credential",
         accountId: existing.id,
         password: hashed,
       },

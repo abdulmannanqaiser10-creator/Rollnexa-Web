@@ -32,6 +32,9 @@ export type SellerSubscriptionView = {
   canCreateListing: boolean;
   listingsRemaining: number | null;
   featuredRemaining: number;
+  reason: "ALLOWED" | "FREE_LISTING_AVAILABLE" | "NO_SUBSCRIPTION" | "SUBSCRIPTION_EXPIRED" | "LISTING_LIMIT_REACHED" | "PLAN_INACTIVE" | "SELLER_DISABLED";
+  freeListingsRemaining: number;
+  requiresSubscription: boolean;
 };
 
 export type CheckoutInput = {

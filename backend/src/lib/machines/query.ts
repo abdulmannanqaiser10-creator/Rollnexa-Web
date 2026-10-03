@@ -115,7 +115,8 @@ function mapMachine(
   category: { name: string } | null;
   images: { url: string }[];
 },
-  premiumSellerIds: Set<string>
+  premiumSellerIds: Set<string>,
+  promotedListingIds: Set<string>
 ): HomeMachine {
   return {
     id: machine.id,
@@ -129,7 +130,7 @@ function mapMachine(
     imageUrl: resolveMachineImageUrl(machine.images[0]?.url),
     brandName: machine.brand?.name ?? null,
     categoryName: machine.category?.name ?? null,
-    isPremium: premiumSellerIds.has(machine.sellerId) || machine.isFeatured,
+    isPremium: premiumSellerIds.has(machine.sellerId) || machine.isFeatured || promotedListingIds.has(machine.id),
   };
 }
 
@@ -206,9 +207,18 @@ export async function browseMachines(
   const premiumSellerIds = await getPremiumSellerIdSet(
     finalRows.map((row) => row.sellerId)
   );
+  const now = new Date();
+  const activePromotions = finalRows.length ? await prisma.listingPromotion.findMany({
+    where: { listingId: { in: finalRows.map((row) => row.id) }, status: "ACTIVE", startAt: { lte: now }, endAt: { gt: now } },
+    orderBy: { prioritySnapshot: "desc" },
+    select: { listingId: true, prioritySnapshot: true },
+  }) : [];
+  const promotionPriority = new Map(activePromotions.map((promotion) => [promotion.listingId, promotion.prioritySnapshot]));
+  const rankedRows = filters.sort === "newest" ? [...finalRows].sort((a, b) => (promotionPriority.get(b.id) ?? 0) - (promotionPriority.get(a.id) ?? 0)) : finalRows;
+  const promotedIds = new Set(promotionPriority.keys());
 
   return {
-    machines: finalRows.map((row) => mapMachine(row, premiumSellerIds)),
+    machines: rankedRows.map((row) => mapMachine(row, premiumSellerIds, promotedIds)),
     pagination: {
       page,
       limit: filters.limit,

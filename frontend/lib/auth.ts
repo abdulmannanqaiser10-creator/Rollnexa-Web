@@ -47,6 +47,11 @@ export const auth = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "mongodb",
   }),
+  experimental: {
+    // The Prisma adapter otherwise falls back to a join path that doesn't
+    // correctly map this project's MongoDB User.accounts relation.
+    joins: true,
+  },
   ...(Object.keys(socialProviders).length > 0 ? { socialProviders } : {}),
   ...(accountLinking ? { account: { accountLinking } } : {}),
   emailAndPassword: {

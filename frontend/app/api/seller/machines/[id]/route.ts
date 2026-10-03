@@ -1,3 +1,4 @@
+import { getSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
@@ -11,9 +12,7 @@ type RouteContext = {
 };
 
 async function requireSellerSession() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const session = await getSession();
 
   if (!session?.user?.id) {
     return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };

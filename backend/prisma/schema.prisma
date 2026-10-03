@@ -114,6 +114,8 @@ enum PaymentProvider {
   STRIPE
   PAYPAL
   RAZORPAY
+  PAYFAST
+  SAFEPAY
 }
 
 enum PaymentMethod {
@@ -122,6 +124,22 @@ enum PaymentMethod {
   WALLET
   BANK_TRANSFER
   OTHER
+}
+
+enum PromotionStatus {
+  PENDING
+  SCHEDULED
+  ACTIVE
+  EXPIRED
+  CANCELLED
+  FAILED
+}
+
+enum PromotionCreditType {
+  GRANT
+  USE
+  REVERSAL
+  EXPIRE
 }
 
 enum ActivityAction {
@@ -156,6 +174,9 @@ model User {
   role          Role          @default(BUYER)
   accountStatus AccountStatus @default(ACTIVE)
   lastLoginAt   DateTime?
+  freeListingsUsed Int @default(0)
+  listingMutationVersion Int @default(0)
+  promotionCreditsBalance Int @default(0)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
 
@@ -182,6 +203,7 @@ model User {
   subscriptions       UserSubscription[]
   payments            Payment[]
   activityLogs        ActivityLog[]
+  promotions          ListingPromotion[]
 
   @@index([role, accountStatus])
   @@index([accountStatus, createdAt])
@@ -229,6 +251,7 @@ model Account {
   userId                String @db.ObjectId
   accountId             String
   providerId            String
+  issuer                String?
   accessToken           String?
   refreshToken          String?
   accessTokenExpiresAt  DateTime?
@@ -323,6 +346,7 @@ model Machine {
   conversations  Conversation[]
   reviews        Review[]
   reports        Report[]
+  promotions     ListingPromotion[]
 
   @@index([sellerId])
   @@index([categoryId])
@@ -537,10 +561,12 @@ model SubscriptionPlan {
   slug              String   @unique
   description       String?
   price             Float    @default(0)
+  yearlyPrice       Float?
   currency          String   @default("USD")
   durationDays      Int      @default(30)
   maxListings       Int?
   featuredListings  Int      @default(0)
+  promotionCredits  Int      @default(0)
   homepageFeatured  Boolean  @default(false)
   premiumBadge      Boolean  @default(false)
   analytics         Boolean  @default(false)
@@ -558,6 +584,83 @@ model SubscriptionPlan {
   @@index([isActive, sortOrder])
 }
 
+model PromotionPackage {
+  id             String   @id @default(auto()) @map("_id") @db.ObjectId
+  name           String
+  slug           String   @unique
+  description    String?
+  price          Float
+  currency       String   @default("PKR")
+  durationDays   Int
+  priority       Int      @default(1)
+  placementType  String   @default("SEARCH")
+  badgeType      String   @default("NONE")
+  isActive       Boolean  @default(true)
+  displayOrder   Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  promotions     ListingPromotion[]
+
+  @@index([isActive, displayOrder])
+}
+
+model ListingPromotion {
+  id                 String          @id @default(auto()) @map("_id") @db.ObjectId
+  sellerId           String          @db.ObjectId
+  listingId          String          @db.ObjectId
+  packageId          String          @db.ObjectId
+  packageNameSnapshot String
+  priceSnapshot      Float
+  currencySnapshot   String
+  durationSnapshot   Int
+  prioritySnapshot   Int
+  badgeTypeSnapshot  String
+  status             PromotionStatus @default(PENDING)
+  paymentId          String?         @db.ObjectId
+  creditLedgerId     String?         @db.ObjectId
+  startAt            DateTime?
+  endAt              DateTime?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  seller             User            @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  listing            Machine         @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  package            PromotionPackage @relation(fields: [packageId], references: [id], onDelete: Restrict)
+
+  @@index([sellerId, status])
+  @@index([listingId, status, endAt])
+  @@index([status, startAt, endAt])
+}
+
+model PromotionCreditLedger {
+  id                   String             @id @default(auto()) @map("_id") @db.ObjectId
+  sellerId             String             @db.ObjectId
+  subscriptionId       String?            @db.ObjectId
+  promotionId          String?            @db.ObjectId
+  listingId            String?            @db.ObjectId
+  type                 PromotionCreditType
+  amount               Int
+  billingCycleReference String?
+  reason               String
+  createdAt            DateTime           @default(now())
+
+  @@index([sellerId, createdAt])
+  @@index([subscriptionId, type])
+  @@index([promotionId])
+}
+
+model FinancialAuditLog {
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  event     String
+  userId    String?  @db.ObjectId
+  targetId  String?
+  metadata  Json?
+  createdAt DateTime @default(now())
+
+  @@index([event, createdAt])
+  @@index([userId, createdAt])
+  @@index([targetId])
+}
+
 model UserSubscription {
   id                String             @id @default(auto()) @map("_id") @db.ObjectId
   userId            String @db.ObjectId
@@ -567,6 +670,7 @@ model UserSubscription {
   expiryDate        DateTime?
   remainingListings Int?
   autoRenew         Boolean            @default(false)
+  billingCycle      String             @default("MONTHLY")
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
 

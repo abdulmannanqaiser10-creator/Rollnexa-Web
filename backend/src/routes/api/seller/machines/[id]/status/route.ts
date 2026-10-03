@@ -1,5 +1,5 @@
+import { getRequestHeaders } from "@/lib/request-context";
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
@@ -19,7 +19,7 @@ type RouteContext = {
 export async function PATCH(request: Request, context: RouteContext) {
   try {
     const session = await auth.api.getSession({
-      headers: await headers(),
+      headers: getRequestHeaders(),
     });
 
     if (!session?.user?.id) {

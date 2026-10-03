@@ -1,3 +1,4 @@
+import { getSession } from "@/lib/session";
 import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
@@ -9,9 +10,7 @@ import { sanitizeText, validateBody } from "@/lib/security";
 
 export async function GET() {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const session = await getSession();
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -55,9 +54,7 @@ export async function GET() {
 
 export async function POST(request: Request) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
+    const session = await getSession();
 
     if (!session?.user?.id) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -99,13 +96,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Selected brand is invalid" }, { status: 400 });
     }
 
-    const { canSellerCreateListing } = await import("@/lib/subscriptions/service");
-    const canCreate = await canSellerCreateListing(session.user.id);
-    if (!canCreate) {
+    const { checkListingEntitlement } = await import("@/lib/subscriptions/service");
+    const entitlement = await checkListingEntitlement(session.user.id);
+    if (!entitlement.canCreateListing) {
       return NextResponse.json(
         {
-          error: "Listing limit reached for your current plan. Upgrade to add more machines.",
-          code: "LISTING_LIMIT_REACHED",
+          error: "Your free or subscription listing allowance has been used. Choose a seller plan to add more listings.",
+          code: entitlement.reason,
+          entitlement,
         },
         { status: 403 }
       );
@@ -120,6 +118,23 @@ export async function POST(request: Request) {
     const slug = uniqueSlug(data.title);
 
     const machine = await prisma.$transaction(async (tx) => {
+      const now = new Date();
+      const [user, freePlan, subscription] = await Promise.all([
+        tx.user.update({ where: { id: session.user.id }, data: { listingMutationVersion: { increment: 1 } }, select: { accountStatus: true, freeListingsUsed: true } }),
+        tx.subscriptionPlan.findUnique({ where: { slug: "free" } }),
+        tx.userSubscription.findFirst({ where: { userId: session.user.id, status: "ACTIVE", OR: [{ expiryDate: null }, { expiryDate: { gt: now } }] }, include: { plan: true }, orderBy: { createdAt: "desc" } }),
+      ]);
+      if (user.accountStatus !== "ACTIVE") throw new Error("SELLER_DISABLED");
+      const plan = subscription?.plan ?? freePlan;
+      if (!plan || !plan.isActive) throw new Error("PLAN_INACTIVE");
+      const currentListings = await tx.machine.count({ where: { sellerId: session.user.id, status: { in: ["DRAFT", "PENDING_REVIEW", "PUBLISHED"] } } });
+      if (plan.maxListings != null && currentListings >= plan.maxListings) throw new Error("LISTING_LIMIT_REACHED");
+      if (plan.slug === "free") {
+        const historicalListings = await tx.machine.count({ where: { sellerId: session.user.id } });
+        const alreadyUsed = Math.max(user.freeListingsUsed, historicalListings);
+        if (alreadyUsed >= (freePlan?.maxListings ?? 1)) throw new Error("NO_SUBSCRIPTION");
+        await tx.user.update({ where: { id: session.user.id }, data: { freeListingsUsed: alreadyUsed + 1 } });
+      }
       const created = await tx.machine.create({
         data: {
           title: data.title,
@@ -163,6 +178,9 @@ export async function POST(request: Request) {
       machine,
     });
   } catch (error) {
+    if (error instanceof Error && ["SELLER_DISABLED", "PLAN_INACTIVE", "LISTING_LIMIT_REACHED", "NO_SUBSCRIPTION"].includes(error.message)) {
+      return NextResponse.json({ error: "Your listing allowance has been used. Upgrade your plan to continue.", code: error.message }, { status: 403 });
+    }
     console.error("[seller/machines] Failed to create machine:", error);
     return NextResponse.json(
       { error: "Unable to create listing. Please try again." },

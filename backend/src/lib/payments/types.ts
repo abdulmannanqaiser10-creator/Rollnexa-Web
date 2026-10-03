@@ -1,4 +1,4 @@
-export type PaymentProviderId = "manual" | "stripe" | "paypal" | "razorpay";
+export type PaymentProviderId = "manual" | "stripe" | "paypal" | "razorpay" | "safepay";
 
 export type CheckoutSessionInput = {
   paymentId: string;
@@ -34,5 +34,5 @@ export interface PaymentProviderAdapter {
   verifyPayment(paymentId: string): Promise<PaymentVerificationResult>;
   verifyWebhook?(
     request: Request
-  ): Promise<{ paymentId: string; success: boolean; transactionId?: string }>;
+  ): Promise<{ paymentId: string; success: boolean; transactionId?: string; amount?: number; currency?: string }>;
 }

@@ -36,7 +36,12 @@ export async function createApp() {
     }
     next();
   });
-  app.use(express.json({ limit: "2mb" }));
+  app.use(express.json({
+    limit: "2mb",
+    verify(req, _res, buffer) {
+      (req as typeof req & { rawBody?: Buffer }).rawBody = Buffer.from(buffer);
+    },
+  }));
   app.use(express.urlencoded({ extended: true }));
 
   app.get("/health", (_req, res) => {

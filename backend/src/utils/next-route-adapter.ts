@@ -46,7 +46,9 @@ async function expressToWebRequest(req: ExpressRequest): Promise<Request> {
   }
 
   let body: string | Buffer | undefined;
-  if (req.body !== undefined && req.body !== null) {
+  const rawBody = (req as ExpressRequest & { rawBody?: Buffer }).rawBody;
+  if (rawBody && rawBody.length > 0) body = rawBody;
+  else if (req.body !== undefined && req.body !== null) {
     if (typeof req.body === "string" || req.body instanceof Buffer) {
       body = req.body;
     } else if (Object.keys(req.body).length > 0) {

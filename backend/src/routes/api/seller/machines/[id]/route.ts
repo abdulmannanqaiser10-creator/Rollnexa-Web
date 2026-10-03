@@ -1,5 +1,5 @@
+import { getRequestHeaders } from "@/lib/request-context";
 import { NextResponse } from "next/server";
-import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { resolveMachineImageUrl } from "@/lib/images/resolve-machine-image-url";
@@ -12,7 +12,7 @@ type RouteContext = {
 
 async function requireSellerSession() {
   const session = await auth.api.getSession({
-    headers: await headers(),
+    headers: getRequestHeaders(),
   });
 
   if (!session?.user?.id) {

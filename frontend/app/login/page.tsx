@@ -13,7 +13,11 @@ export const metadata: Metadata = buildMetadata({
 });
 
 type LoginPageProps = {
-  searchParams: Promise<{ callbackUrl?: string; error?: string }>;
+  searchParams: Promise<{
+    callbackUrl?: string;
+    error?: string;
+    email?: string;
+  }>;
 };
 
 export default async function LoginPage({ searchParams }: LoginPageProps) {
@@ -22,6 +26,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
     ? params.callbackUrl
     : undefined;
   const oauthError = params.error?.trim() || undefined;
+  const initialEmail = params.email?.trim().slice(0, 254) || undefined;
 
   return (
     <AuthLayout
@@ -29,7 +34,11 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
       headline="Login to Your Rollnexa Account"
       description="Access your account to manage listings, messages and more."
     >
-      <LoginForm callbackUrl={callbackUrl} oauthError={oauthError} />
+      <LoginForm
+        callbackUrl={callbackUrl}
+        oauthError={oauthError}
+        initialEmail={initialEmail}
+      />
     </AuthLayout>
   );
 }

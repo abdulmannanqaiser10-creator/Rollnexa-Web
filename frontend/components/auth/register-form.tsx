@@ -14,6 +14,9 @@ import { PasswordInput } from "./password-input";
 import {
   authClient,
   dashboardPathForRole,
+  describeAuthError,
+  isDuplicateEmailError,
+  isExpectedAuthError,
   mapAuthError,
 } from "@/lib/auth-client";
 import {
@@ -64,6 +67,7 @@ function FieldError({ id, message }: { id: string; message?: string }) {
 function RegisterForm() {
   const router = useRouter();
   const [error, setError] = useState<string | null>(null);
+  const [registeredEmail, setRegisteredEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   const {
@@ -94,7 +98,10 @@ function RegisterForm() {
     : null;
 
   async function onSubmit(data: RegisterValues) {
+    if (loading) return;
+
     setError(null);
+    setRegisteredEmail(null);
     setLoading(true);
 
     try {
@@ -106,10 +113,20 @@ function RegisterForm() {
       });
 
       if (signUpError) {
-        console.error("[register] sign-up failed:", signUpError);
+        const details = describeAuthError(signUpError);
+        // A rejected sign-up the visitor can act on is a UI outcome, not a bug —
+        // console.error would raise a dev overlay on top of the message we show.
+        if (isExpectedAuthError(signUpError)) {
+          console.warn("[register] sign-up rejected:", details);
+        } else {
+          console.error("[register] sign-up failed:", details);
+        }
         setError(
           mapAuthError(signUpError, "Registration failed. Please try again.")
         );
+        if (isDuplicateEmailError(signUpError)) {
+          setRegisteredEmail(data.email);
+        }
         return;
       }
 
@@ -123,6 +140,7 @@ function RegisterForm() {
         if (!profileRes.ok) {
           console.error(
             "[register] profile update failed:",
+            profileRes.status,
             await profileRes.text()
           );
         }
@@ -151,8 +169,19 @@ function RegisterForm() {
       </div>
 
       {error && (
-        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+        <div
+          role="alert"
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700"
+        >
           {error}
+          {registeredEmail && (
+            <Link
+              href={`/login?email=${encodeURIComponent(registeredEmail)}`}
+              className="mt-1 block font-semibold text-amber-600 hover:text-amber-700"
+            >
+              Log in with this email
+            </Link>
+          )}
         </div>
       )}
 

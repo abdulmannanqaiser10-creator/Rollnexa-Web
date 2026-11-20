@@ -13,6 +13,8 @@ import { PasswordInput } from "./password-input";
 import {
   authClient,
   dashboardPathForRole,
+  describeAuthError,
+  isExpectedAuthError,
   mapAuthError,
 } from "@/lib/auth-client";
 import { loginSchema } from "@/lib/validations/auth";
@@ -25,9 +27,11 @@ type LoginValues = z.infer<typeof loginSchema>;
 function LoginForm({
   callbackUrl,
   oauthError,
+  initialEmail,
 }: {
   callbackUrl?: string;
   oauthError?: string;
+  initialEmail?: string;
 }) {
   const router = useRouter();
   const [error, setError] = useState<string | null>(oauthError ?? null);
@@ -39,7 +43,7 @@ function LoginForm({
     formState: { errors },
   } = useForm<LoginValues>({
     resolver: zodResolver(loginSchema),
-    defaultValues: { email: "", password: "", remember: false },
+    defaultValues: { email: initialEmail ?? "", password: "", remember: false },
   });
 
   async function onSubmit(data: LoginValues) {
@@ -54,7 +58,12 @@ function LoginForm({
       });
 
       if (signInError) {
-        console.error("[login] sign-in failed:", signInError);
+        const details = describeAuthError(signInError);
+        if (isExpectedAuthError(signInError)) {
+          console.warn("[login] sign-in rejected:", details);
+        } else {
+          console.error("[login] sign-in failed:", details);
+        }
         setError(
           mapAuthError(signInError, "Invalid email or password")
         );

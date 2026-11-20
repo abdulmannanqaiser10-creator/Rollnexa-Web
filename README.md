@@ -198,3 +198,8 @@ Use the [Safepay API reference](https://apidocs.getsafepay.com/) and the [offici
 ## License
 
 Private / proprietary — all rights reserved unless otherwise stated.
+
+<!-- 
+## Testing
+Seller acc / abdulmannanqaiser10@gmail.com / @#$%Aabdul12345
+Buyer acc / codewithabdul10@gmail.com / @#$%Acode12345 -->

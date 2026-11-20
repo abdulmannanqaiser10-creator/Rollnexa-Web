@@ -7,6 +7,7 @@ import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { describeAuthError } from "@/lib/auth-client";
 
 const forgotPasswordSchema = z.object({
   email: z.string().min(1, "Email is required").email("Please enter a valid email"),
@@ -41,14 +42,25 @@ export function ForgotPasswordForm() {
 
       const result = await response.json().catch(() => null);
       if (!response.ok) {
-        setStatus(result?.message || "Unable to process password reset request");
+        const details = `${response.status} ${JSON.stringify(result ?? null)}`;
+        if (response.status >= 500) {
+          console.error("[forgot-password] request failed:", details);
+        } else {
+          console.warn("[forgot-password] request rejected:", details);
+        }
+        setStatus(
+          response.status === 429
+            ? "Too many requests. Please try again in a minute."
+            : "Unable to process password reset request"
+        );
         return;
       }
 
       setStatus(result?.message || "If this email exists, a reset link has been sent.");
       reset();
     } catch (error) {
-      setStatus(error instanceof Error ? error.message : "Unexpected error");
+      console.error("[forgot-password] request failed:", describeAuthError(error));
+      setStatus("Unable to process password reset request");
     } finally {
       setLoading(false);
     }
